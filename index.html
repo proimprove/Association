@@ -49,11 +49,10 @@
             Play, Pause, SkipForward, Square, Clock, Settings, RotateCcw, 
             Info, CheckCircle2, Timer, Zap, BrainCircuit, Lightbulb, 
             Sparkles, Zap as ZapIcon, Eye, Heart, Crown, MapPin, 
-            Quote, AlertTriangle, Loader2, Wand2, KeyRound
+            Quote, AlertTriangle, Loader2, Wand2, KeyRound, ChevronLeft, Sliders
         } from 'lucide-react';
 
         // --- КОНФИГУРАЦИЯ API ---
-        // Теперь ключ можно сохранить в localStorage, чтобы не вводить каждый раз
         const getStoredApiKey = () => localStorage.getItem('gemini_api_key') || "";
         const setStoredApiKey = (key) => localStorage.setItem('gemini_api_key', key);
 
@@ -168,6 +167,7 @@
 
         function App() {
             const [screen, setScreen] = useState('SETTINGS'); 
+            const [showProSettings, setShowProSettings] = useState(false); // Новое состояние для разделения экранов
 
             // Настройки
             const [totalDuration, setTotalDuration] = useState(180);
@@ -229,27 +229,49 @@
                 return null;
             };
 
-            const startGame = async () => {
+            // Обновленная функция старта, принимающая настройки
+            const startGame = async (overrides = {}) => {
+                // Используем переданные настройки или текущий стейт
+                const configDuration = overrides.duration || totalDuration;
+                const configInterval = overrides.interval || wordInterval;
+                const configCategory = overrides.category || category;
+                
                 let currentPool = [];
 
-                if (category === CATEGORIES.AI_CUSTOM.id) {
+                if (configCategory === CATEGORIES.AI_CUSTOM.id) {
                     const generated = await generateCustomWords();
                     if (!generated) return;
                     currentPool = generated;
                 }
 
-                setRoundTimeLeft(totalDuration);
-                setWordTimeLeft(wordInterval);
+                // Обновляем стейт для синхронизации (если был быстрый старт)
+                if (overrides.duration) setTotalDuration(overrides.duration);
+                if (overrides.interval) setWordInterval(overrides.interval);
+                if (overrides.category) setCategory(overrides.category);
+                if (overrides.mode) setModeId(overrides.mode);
+
+                setRoundTimeLeft(configDuration);
+                setWordTimeLeft(configInterval);
                 setWordsHistory([]);
                 setWordsCount(0);
                 setAiHint(null);
                 
-                const firstWord = getRandomWord(category, [], category === CATEGORIES.AI_CUSTOM.id ? currentPool : []);
+                const firstWord = getRandomWord(configCategory, [], configCategory === CATEGORIES.AI_CUSTOM.id ? currentPool : []);
                 setCurrentWord(firstWord);
                 setWordsHistory([firstWord]);
                 
                 setIsPlaying(true);
                 setScreen('GAME');
+            };
+
+            const handleQuickStart = () => {
+                // Запуск "Классики" по дефолту
+                startGame({
+                    duration: 180,
+                    interval: 7,
+                    category: 'all',
+                    mode: 'classic'
+                });
             };
 
             const nextWord = () => {
@@ -306,19 +328,83 @@
 
             // --- ЭКРАНЫ ---
 
-            const ScreenSettings = () => (
+            const renderStartScreen = () => {
+                if (showProSettings) return renderProSettings();
+                
+                return (
+                    <div className="flex flex-col h-full max-w-md mx-auto p-6 animate-fade-in bg-white justify-center">
+                        <div className="text-center mb-10">
+                            <div className="inline-flex items-center justify-center p-4 bg-indigo-50 rounded-2xl mb-4">
+                                <Sparkles className="w-10 h-10 text-indigo-600" />
+                            </div>
+                            <h1 className="text-4xl font-black text-gray-900 mb-2">Ассоциации</h1>
+                            <p className="text-gray-500 text-lg">Тренируй скорость мышления</p>
+                        </div>
+
+                        <div className="space-y-4 w-full">
+                            <button
+                                onClick={handleQuickStart}
+                                className="w-full group relative bg-indigo-600 hover:bg-indigo-700 text-white p-5 rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-between overflow-hidden"
+                            >
+                                <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform"></div>
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-white/20 p-2 rounded-xl">
+                                        <Zap className="w-6 h-6 text-white" />
+                                    </div>
+                                    <div className="text-left">
+                                        <div className="font-bold text-xl leading-none mb-1">Быстрый старт</div>
+                                        <div className="text-indigo-100 text-xs font-medium">Классика • 3 мин</div>
+                                    </div>
+                                </div>
+                                <div className="bg-white/20 p-2 rounded-full">
+                                    <Play className="w-5 h-5 fill-current" />
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={() => setShowProSettings(true)}
+                                className="w-full bg-white border-2 border-gray-100 hover:border-gray-300 text-gray-700 p-5 rounded-2xl transition-all active:bg-gray-50 flex items-center justify-between"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-gray-100 p-2 rounded-xl">
+                                        <Sliders className="w-6 h-6 text-gray-500" />
+                                    </div>
+                                    <div className="text-left">
+                                        <div className="font-bold text-lg leading-none mb-1">Своя игра</div>
+                                        <div className="text-gray-400 text-xs font-medium">Настройки режимов и тем</div>
+                                    </div>
+                                </div>
+                                <div className="text-gray-300">
+                                    <ChevronLeft className="w-5 h-5 rotate-180" />
+                                </div>
+                            </button>
+                        </div>
+
+                        <div className="mt-8 flex justify-center">
+                            <button onClick={() => setScreen('RULES')} className="text-gray-400 font-medium text-sm flex items-center gap-2 hover:text-gray-600 transition-colors">
+                                <Info className="w-4 h-4" /> Как играть?
+                            </button>
+                        </div>
+                    </div>
+                );
+            };
+
+            const renderProSettings = () => (
                 <div className="flex flex-col h-full max-w-md mx-auto p-4 animate-fade-in bg-gray-50">
-                    <div className="text-center mb-6 mt-4 relative">
+                    <div className="flex items-center justify-between mb-4 mt-2">
+                        <button 
+                            onClick={() => setShowProSettings(false)}
+                            className="p-2 -ml-2 text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
+                        >
+                            <ChevronLeft size={24} />
+                        </button>
+                        <h2 className="text-xl font-bold text-gray-800">Настройки</h2>
                         <button 
                             onClick={() => setShowKeyInput(!showKeyInput)}
-                            className="absolute right-0 top-0 p-2 text-gray-400 hover:text-indigo-600"
+                            className={`p-2 rounded-full transition-colors ${showKeyInput ? 'text-indigo-600 bg-indigo-50' : 'text-gray-400 hover:text-gray-600'}`}
                         >
                             <KeyRound size={20} />
                         </button>
-                        <h1 className="text-3xl font-bold text-indigo-600 mb-1 flex items-center justify-center gap-2">
-                           Ассоциации <Sparkles className="w-5 h-5 text-amber-500" />
-                        </h1>
-                        <p className="text-sm text-gray-500">Настройки раунда</p>
                     </div>
 
                     {showKeyInput && (
@@ -442,18 +528,16 @@
                     </div>
 
                     <button
-                        onClick={startGame}
+                        onClick={() => startGame()}
                         disabled={isGeneratingWords}
                         className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 disabled:cursor-wait active:bg-indigo-800 text-white font-bold py-3.5 rounded-xl shadow-lg transition-colors text-lg mt-4 flex items-center justify-center gap-2"
                     >
-                        {isGeneratingWords ? <><Loader2 className="w-5 h-5 animate-spin" /> Генерируем...</> : "Начать игру"}
+                        {isGeneratingWords ? <><Loader2 className="w-5 h-5 animate-spin" /> Генерируем...</> : "Начать"}
                     </button>
-                    
-                    <button onClick={() => setScreen('RULES')} className="w-full text-gray-500 font-medium py-2 text-sm mt-1">Как играть?</button>
                 </div>
             );
 
-            const ScreenRules = () => (
+            const renderRules = () => (
                 <div className="flex flex-col h-full max-w-md mx-auto p-4 animate-fade-in bg-white">
                     <div className="text-center mb-4 mt-2">
                         <h2 className="text-2xl font-bold text-gray-800">Инструкция</h2>
@@ -479,7 +563,7 @@
                 </div>
             );
 
-            const ScreenGame = () => {
+            const renderGame = () => {
                 const progress = (wordTimeLeft / wordInterval) * 100;
                 const isUrgent = wordTimeLeft < 3; 
                 const ModeIcon = activeMode.icon;
@@ -496,12 +580,12 @@
                         </div>
 
                         <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
-                            <div className="mb-6 animate-fade-in bg-indigo-100 text-indigo-800 px-4 py-1.5 rounded-full flex items-center gap-2 shadow-sm">
+                            <div className="mb-6 bg-indigo-100 text-indigo-800 px-4 py-1.5 rounded-full flex items-center gap-2 shadow-sm">
                                 <ModeIcon size={16} />
                                 <span className="text-xs font-bold uppercase tracking-wide">{activeMode.label}</span>
                             </div>
                             
-                            <div className="mb-8 animate-scale-in min-h-[80px] flex items-center justify-center w-full">
+                            <div key={currentWord} className="mb-8 animate-scale-in min-h-[80px] flex items-center justify-center w-full">
                                 <h1 className="text-4xl md:text-5xl font-black text-gray-900 break-words leading-tight text-center">{currentWord}</h1>
                             </div>
 
@@ -551,7 +635,7 @@
                 );
             };
 
-            const ScreenResults = () => {
+            const renderResults = () => {
                 const timeSpent = totalDuration - Math.max(0, roundTimeLeft);
                 return (
                     <div className="flex flex-col h-full max-w-md mx-auto p-4 animate-fade-in justify-center bg-gray-50">
@@ -571,8 +655,8 @@
                                 </div>
                             </div>
                             <div className="p-6 bg-gray-50 space-y-3">
-                                <button onClick={startGame} className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow"><RotateCcw className="w-5 h-5" /> Повторить раунд</button>
-                                <button onClick={() => setScreen('SETTINGS')} className="w-full flex items-center justify-center gap-2 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold py-3.5 rounded-xl"><Settings className="w-5 h-5" /> Изменить настройки</button>
+                                <button onClick={handleQuickStart} className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow"><RotateCcw className="w-5 h-5" /> Повторить "Классику"</button>
+                                <button onClick={() => setScreen('SETTINGS')} className="w-full flex items-center justify-center gap-2 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold py-3.5 rounded-xl"><Settings className="w-5 h-5" /> В меню</button>
                             </div>
                         </div>
                     </div>
@@ -581,10 +665,10 @@
 
             return (
                 <>
-                  {screen === 'SETTINGS' && <ScreenSettings />}
-                  {screen === 'RULES' && <ScreenRules />}
-                  {screen === 'GAME' && <ScreenGame />}
-                  {screen === 'RESULTS' && <ScreenResults />}
+                  {screen === 'SETTINGS' && renderStartScreen()}
+                  {screen === 'RULES' && renderRules()}
+                  {screen === 'GAME' && renderGame()}
+                  {screen === 'RESULTS' && renderResults()}
                 </>
             );
         }
