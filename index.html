@@ -49,7 +49,7 @@
             Play, Pause, SkipForward, Square, Clock, Settings, RotateCcw, 
             Info, CheckCircle2, Timer, Zap, BrainCircuit, Lightbulb, 
             Sparkles, Zap as ZapIcon, Eye, Heart, Crown, MapPin, 
-            Quote, AlertTriangle, Loader2, Wand2, KeyRound, ChevronLeft, Sliders
+            Quote, AlertTriangle, Loader2, Wand2, KeyRound, ChevronLeft, Sliders, X, ExternalLink
         } from 'lucide-react';
 
         // --- КОНФИГУРАЦИЯ API ---
@@ -58,10 +58,7 @@
 
         const callGemini = async (prompt, userKey) => {
             const keyToUse = userKey || getStoredApiKey();
-            if (!keyToUse) {
-                alert("Для работы AI функций нужен API ключ. Введите его в настройках.");
-                return null;
-            }
+            if (!keyToUse) return null; // Ключ проверяется уровнем выше
 
             try {
                 const response = await fetch(
@@ -167,7 +164,8 @@
 
         function App() {
             const [screen, setScreen] = useState('SETTINGS'); 
-            const [showProSettings, setShowProSettings] = useState(false); // Новое состояние для разделения экранов
+            const [showProSettings, setShowProSettings] = useState(false); 
+            const [showApiKeyModal, setShowApiKeyModal] = useState(false); // Для модалки ключа
 
             // Настройки
             const [totalDuration, setTotalDuration] = useState(180);
@@ -183,8 +181,6 @@
             const [customTopic, setCustomTopic] = useState('');
             const [customWords, setCustomWords] = useState([]);
             const [isGeneratingWords, setIsGeneratingWords] = useState(false);
-            const [aiHint, setAiHint] = useState(null);
-            const [isGeneratingHint, setIsGeneratingHint] = useState(false);
 
             // Состояние игры
             const [isPlaying, setIsPlaying] = useState(false);
@@ -201,11 +197,26 @@
             // --- ЛОГИКА ---
 
             const handleSaveKey = () => {
+                if (!apiKeyInput.trim()) {
+                    alert("Введите ключ!");
+                    return;
+                }
                 setStoredApiKey(apiKeyInput);
                 setShowKeyInput(false);
+                setShowApiKeyModal(false);
+            };
+
+            const checkApiKey = () => {
+                const key = getStoredApiKey();
+                if (!key) {
+                    setShowApiKeyModal(true);
+                    return false;
+                }
+                return true;
             };
 
             const generateCustomWords = async () => {
+                if (!checkApiKey()) return null;
                 if (!customTopic.trim()) {
                     alert("Пожалуйста, введите тему!");
                     return null;
@@ -229,22 +240,24 @@
                 return null;
             };
 
-            // Обновленная функция старта, принимающая настройки
             const startGame = async (overrides = {}) => {
-                // Используем переданные настройки или текущий стейт
-                const configDuration = overrides.duration || totalDuration;
-                const configInterval = overrides.interval || wordInterval;
                 const configCategory = overrides.category || category;
                 
                 let currentPool = [];
 
                 if (configCategory === CATEGORIES.AI_CUSTOM.id) {
+                    // Проверка ключа перед стартом AI режима
+                    if (!checkApiKey()) return;
+                    
                     const generated = await generateCustomWords();
                     if (!generated) return;
                     currentPool = generated;
                 }
 
-                // Обновляем стейт для синхронизации (если был быстрый старт)
+                // ... остальная логика старта ...
+                const configDuration = overrides.duration || totalDuration;
+                const configInterval = overrides.interval || wordInterval;
+
                 if (overrides.duration) setTotalDuration(overrides.duration);
                 if (overrides.interval) setWordInterval(overrides.interval);
                 if (overrides.category) setCategory(overrides.category);
@@ -254,7 +267,6 @@
                 setWordTimeLeft(configInterval);
                 setWordsHistory([]);
                 setWordsCount(0);
-                setAiHint(null);
                 
                 const firstWord = getRandomWord(configCategory, [], configCategory === CATEGORIES.AI_CUSTOM.id ? currentPool : []);
                 setCurrentWord(firstWord);
@@ -265,7 +277,6 @@
             };
 
             const handleQuickStart = () => {
-                // Запуск "Классики" по дефолту
                 startGame({
                     duration: 180,
                     interval: 7,
@@ -280,24 +291,12 @@
                 setWordsHistory(prev => [...prev, newWord]);
                 setWordsCount(prev => prev + 1);
                 setWordTimeLeft(wordInterval);
-                setAiHint(null);
             };
 
             const stopGame = () => {
                 setIsPlaying(false);
                 if (timerRef.current) clearInterval(timerRef.current);
                 setScreen('RESULTS');
-            };
-
-            const getHint = async () => {
-                if (isGeneratingHint || aiHint) return;
-                setIsGeneratingHint(true);
-                const prompt = `Придумай 3 короткие, яркие и неочевидные ассоциации к слову "${currentWord}" на русском языке. Верни только эти 3 слова/фразы через запятую.`;
-                const result = await callGemini(prompt, apiKeyInput);
-                setIsGeneratingHint(false);
-                if (result) {
-                    setAiHint(result);
-                }
             };
 
             useEffect(() => {
@@ -325,6 +324,56 @@
                 }
                 return () => clearInterval(timerRef.current);
             }, [screen, isPlaying, wordInterval, category, wordsHistory, customWords]);
+
+            // --- РЕНДЕР МОДАЛКИ КЛЮЧА ---
+            const renderApiKeyModal = () => {
+                if (!showApiKeyModal) return null;
+                return (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
+                        <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full relative">
+                            <button 
+                                onClick={() => setShowApiKeyModal(false)}
+                                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+                            >
+                                <X size={20} />
+                            </button>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="bg-amber-100 p-2 rounded-xl">
+                                    <KeyRound className="w-6 h-6 text-amber-600" />
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-800">Нужен API ключ</h3>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-4 leading-relaxed">
+                                Для работы умных функций (генерация тем) нужен ключ от Google Gemini. Это бесплатно.
+                            </p>
+                            
+                            <a 
+                                href="https://aistudio.google.com/app/apikey" 
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 text-indigo-600 font-bold text-sm mb-4 hover:underline"
+                            >
+                                Получить ключ в Google AI Studio <ExternalLink size={14} />
+                            </a>
+
+                            <input 
+                                type="password" 
+                                value={apiKeyInput}
+                                onChange={(e) => setApiKeyInput(e.target.value)}
+                                className="w-full p-3 border-2 border-indigo-100 rounded-xl mb-4 focus:border-indigo-500 outline-none transition-colors"
+                                placeholder="Вставьте ключ сюда..."
+                            />
+                            
+                            <button 
+                                onClick={handleSaveKey}
+                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-colors"
+                            >
+                                Сохранить и продолжить
+                            </button>
+                        </div>
+                    </div>
+                );
+            };
 
             // --- ЭКРАНЫ ---
 
@@ -406,29 +455,12 @@
                         </button>
                         <h2 className="text-xl font-bold text-gray-800">Настройки</h2>
                         <button 
-                            onClick={() => setShowKeyInput(!showKeyInput)}
-                            className={`p-2 rounded-full transition-colors ${showKeyInput ? 'text-indigo-600 bg-indigo-50' : 'text-gray-400 hover:text-gray-600'}`}
+                            onClick={() => setShowApiKeyModal(true)} 
+                            className={`p-2 rounded-full transition-colors ${getStoredApiKey() ? 'text-indigo-600 bg-indigo-50' : 'text-gray-400 hover:text-gray-600'}`}
                         >
                             <KeyRound size={20} />
                         </button>
                     </div>
-
-                    {showKeyInput && (
-                        <div className="mb-4 bg-white p-4 rounded-2xl shadow-sm border border-indigo-100 animate-fade-in">
-                            <label className="block text-xs font-bold text-gray-500 mb-2">Gemini API Key</label>
-                            <input 
-                                type="password" 
-                                value={apiKeyInput}
-                                onChange={(e) => setApiKeyInput(e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-lg text-sm mb-2"
-                                placeholder="Вставьте ключ сюда"
-                            />
-                            <button onClick={handleSaveKey} className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-bold">
-                                Сохранить
-                            </button>
-                            <p className="text-[10px] text-gray-400 mt-2">Ключ сохранится в браузере. Нужен для AI функций.</p>
-                        </div>
-                    )}
 
                     <div className="flex-1 space-y-6 overflow-y-auto pb-4 pr-1 scrollbar-hide">
                         {/* Категории */}
@@ -561,7 +593,6 @@
                             <ul className="list-disc pl-5 space-y-2 text-sm">
                                 <li>Говори <b>вслух</b> и быстро.</li>
                                 <li>Не оценивай ответы.</li>
-                                <li>AI подсказка (кнопка 💡) поможет если завис.</li>
                             </ul>
                         </div>
                     </div>
@@ -595,15 +626,6 @@
                                 <h1 className="text-4xl md:text-5xl font-black text-gray-900 break-words leading-tight text-center">{currentWord}</h1>
                             </div>
 
-                            {aiHint && (
-                               <div className="mb-6 bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl text-sm animate-fade-in max-w-xs shadow-sm">
-                                  <div className="flex items-center gap-1 mb-1 text-xs font-bold text-amber-600 uppercase">
-                                    <Sparkles size={12}/> Подсказка Gemini
-                                  </div>
-                                  {aiHint}
-                               </div>
-                            )}
-
                             <div className="relative w-24 h-24 flex items-center justify-center mt-2">
                                 <svg className="w-full h-full transform -rotate-90">
                                     <circle cx="48" cy="48" r="40" className="stroke-gray-200" strokeWidth="6" fill="transparent" />
@@ -614,16 +636,11 @@
                         </div>
 
                         <div className="bg-white p-4 border-t border-gray-200 shadow-lg relative z-20">
-                            <div className="flex justify-between items-center mb-3 max-w-sm mx-auto">
-                                <button onClick={() => setIsPlaying(!isPlaying)} className="p-3 rounded-xl bg-gray-100 text-gray-700 font-bold hover:bg-gray-200">
-                                    {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                            <div className="max-w-sm mx-auto flex items-center gap-4">
+                                <button onClick={() => setIsPlaying(!isPlaying)} className="p-4 rounded-2xl bg-gray-100 text-gray-700 font-bold hover:bg-gray-200 shrink-0">
+                                    {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
                                 </button>
-                                <button onClick={getHint} disabled={!isPlaying || isGeneratingHint || aiHint} className={`flex items-center gap-2 px-4 py-3 rounded-xl font-bold text-sm transition-all ${aiHint ? 'bg-gray-100 text-gray-400' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}>
-                                    {isGeneratingHint ? <Loader2 className="w-4 h-4 animate-spin"/> : <Lightbulb className="w-4 h-4 fill-current"/>} {isGeneratingHint ? "Думаю..." : "Идея"}
-                                </button>
-                            </div>
-                            <div className="max-w-sm mx-auto">
-                                <button onClick={nextWord} disabled={!isPlaying} className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-4 rounded-2xl font-bold text-xl shadow-md active:scale-95">
+                                <button onClick={nextWord} disabled={!isPlaying} className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-4 rounded-2xl font-bold text-xl shadow-md active:scale-95">
                                     Дальше <SkipForward className="w-6 h-6" />
                                 </button>
                             </div>
@@ -671,6 +688,7 @@
 
             return (
                 <>
+                  {renderApiKeyModal()}
                   {screen === 'SETTINGS' && renderStartScreen()}
                   {screen === 'RULES' && renderRules()}
                   {screen === 'GAME' && renderGame()}
