@@ -141,9 +141,14 @@ body{font-family:'Montserrat',sans-serif;background:var(--bg);min-height:100vh;d
 .word-pill{background:var(--pm);color:var(--pd);font-size:11px;font-weight:600;padding:6px 14px;border-radius:100px;letter-spacing:.2px;}
 .restart-btn{background:var(--p);color:#fff;border:none;border-radius:14px;padding:16px;font-family:'Montserrat',sans-serif;font-size:13px;font-weight:700;cursor:pointer;width:100%;letter-spacing:.2px;transition:opacity .1s;}
 .restart-btn:active{opacity:.85;}
+
+.sound-toggle{position:fixed;top:16px;right:16px;z-index:50;width:36px;height:36px;border-radius:50%;border:.5px solid var(--pb);background:var(--pm);color:var(--pd);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.sound-toggle:active{background:var(--p);color:#fff;}
 </style>
 </head>
 <body>
+
+<button class="sound-toggle" id="sound-toggle" title="Звук">🔊</button>
 
 <!-- HOME -->
 <div class="screen active" id="screen-home">
@@ -339,6 +344,7 @@ const WORDS = {
   tech:     ['Экран','Робот','Сеть','Код','Батарея','Антенна','Процессор','Алгоритм','Дрон','Чип','Спутник','Интерфейс','Сигнал','Камера','Сервер','Кабель','Сканер','Принтер','Маршрутизатор','Архив','Искусственный интеллект','База данных','Браузер','Облако','Протокол','Шифрование','Уязвимость','Обновление','Прошивка','Консоль','Терминал','Пиксель','Байт','Гигабайт','Частота','Задержка','Компилятор','Отладчик','Фреймворк','Библиотека','Токен','Блокчейн','Транзакция','Смарт-контракт','Виртуальность','Симуляция','Голограмма','Нейросеть','Датчик','Микрофон'],
   mix:      []
 };
+WORDS.mix = Object.keys(WORDS).filter(k=>k!=='mix').flatMap(k=>WORDS[k]);
 
 const CAT_NAMES={animals:'Животные',objects:'Предметы',nature:'Природа',food:'Еда',emotions:'Эмоции',places:'Места',people:'Люди',tech:'Технологии',mix:'Все вместе'};
 const CAT_EMOJI={animals:'🐾 ',objects:'🪑 ',nature:'🌿 ',food:'🍎 ',emotions:'❤️ ',places:'🌍 ',people:'🧑 ',tech:'💻 ',mix:'🎲 '};
@@ -348,8 +354,9 @@ const TITLES=['Отлично!','Прекрасно!','Огонь!','Так де
 const SUBS=['Мозг разогрет 🔥','Ассоциации льются рекой','Мышление прокачано','Продолжай в том же духе'];
 
 let actx;
+let soundOn = true;
 function ac(){if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();return actx;}
-function beep(f,d,v=.3){try{const c=ac(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=f;g.gain.setValueAtTime(v,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+d);o.start();o.stop(c.currentTime+d);}catch(e){}}
+function beep(f,d,v=.3){if(!soundOn)return;try{const c=ac(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=f;g.gain.setValueAtTime(v,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+d);o.start();o.stop(c.currentTime+d);}catch(e){}}
 const sndWord=()=>{beep(440,.1,.25);setTimeout(()=>beep(330,.14,.2),130);};
 const sndSess=()=>{beep(660,.18,.35);setTimeout(()=>beep(528,.18,.3),220);setTimeout(()=>beep(396,.4,.25),440);};
 document.addEventListener('click',()=>{try{ac();}catch(e){}},{once:true});
@@ -401,7 +408,7 @@ function startCountdown(){
   const nEl=document.getElementById('countdown-num');
   const lEl=document.getElementById('countdown-label');
   ov.classList.add('show');
-  let n=5;nEl.textContent=n;lEl.textContent='Приготовься';beep(440,.08,.22);
+  let n=3;nEl.textContent=n;lEl.textContent='Приготовься';beep(440,.08,.22);
   const tick=setInterval(()=>{
     n--;
     if(n>0){nEl.textContent=n;nEl.style.animation='none';nEl.offsetHeight;nEl.style.animation='';beep(440,.08,.22);}
@@ -422,7 +429,13 @@ function loadWord(){
 
 const CIRC=188.5;
 function startWord(){
-  clearInterval(wT);gs.wLeft=cfg.wordSec;updTimer();
+  clearInterval(wT);gs.wLeft=cfg.wordSec;
+  const bar=document.getElementById('g-timer-bar');
+  bar.style.transition='none';
+  bar.style.width='100%';
+  bar.offsetHeight; // force reflow
+  bar.style.transition='width 1s linear';
+  updTimer();
   wT=setInterval(()=>{gs.wLeft--;updTimer();if(gs.wLeft<=0){sndWord();nextWord();}},1000);
 }
 
@@ -478,6 +491,11 @@ function showScreen(n){
   document.getElementById('screen-'+n).classList.add('active');
   window.scrollTo(0,0);
 }
+
+document.getElementById('sound-toggle').addEventListener('click',()=>{
+  soundOn=!soundOn;
+  document.getElementById('sound-toggle').textContent=soundOn?'🔊':'🔇';
+});
 if(window.Telegram&&Telegram.WebApp){Telegram.WebApp.ready();Telegram.WebApp.expand();}
 </script>
 </body>
